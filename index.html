@@ -33,8 +33,7 @@
       const [popupItem, setPopupItem] = useState(null);
       const [filtro, setFiltro] = useState("TODOS");
       const [modoPreview, setModoPreview] = useState(false);
-      const [mostrarEnviarNovamente, setMostrarEnviarNovamente] = useState(false);
-      const [mostrarCompartilhar, setMostrarCompartilhar] = useState(false);
+      const [enviado, setEnviado] = useState(false);
 
       const sugeridos = produtos.filter(p => 
         p.nome.toLowerCase().includes(busca.toLowerCase()) &&
@@ -57,7 +56,7 @@
         setSacola(sacola.filter((_, i) => i !== idx));
       }
 
-      function gerarPlanilha(previsualizar = false) {
+      async function gerarPlanilha(previsualizar = false) {
         const porCategoria = {};
         sacola.forEach(item => {
           if (!porCategoria[item.categoria]) porCategoria[item.categoria] = [];
@@ -81,32 +80,27 @@
         });
 
         const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-        const blob = new Blob([wbout], { type: "application/octet-stream" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "lista_compras.xlsx";
-        a.click();
+        const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const file = new File([blob], "lista_compras.xlsx", { type: blob.type });
 
-        const numeroFicticio = "557798280639";
-        const mensagem = encodeURIComponent("Lista_compras_enviada!");
-        window.open(`https://wa.me/${numeroFicticio}?text=${mensagem}`, "_blank");
-
-        // Ativar botão de enviar novamente
-        setMostrarEnviarNovamente(true);
-      }
-
-      function compartilharManual() {
-        if (navigator.share) {
-          navigator.share({
-            title: "Lista de Compras",
-            text: "Veja minha lista de compras!",
-            url: window.location.href
-          }).catch(() => {
-            setMostrarCompartilhar(false);
-          });
-        } else {
-          alert("Compartilhamento direto não é suportado neste navegador.");
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: "Lista de Compras",
+              text: "Segue minha lista de compras:",
+              files: [file]
+            });
+            setEnviado(true);
+          } else {
+            alert("Compartilhamento não suportado neste dispositivo. O arquivo será baixado.");
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "lista_compras.xlsx";
+            a.click();
+          }
+        } catch (err) {
+          console.log("Compartilhamento cancelado ou erro:", err);
         }
       }
 
@@ -177,7 +171,7 @@
               </div>
             </>
           ) : (
-            <div className="bg-white p-4 rounded shadow relative">
+            <div className="bg-white p-4 rounded shadow">
               <h2 className="text-lg font-bold mb-2">Pré-visualização</h2>
               {Object.entries(sacola.reduce((acc, item) => {
                 if (!acc[item.categoria]) acc[item.categoria] = [];
@@ -192,43 +186,16 @@
                 </div>
               ))}
 
-              <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                <button className="bg-gray-400 text-white px-4 py-2 rounded flex-1" onClick={()=>setModoPreview(false)}>Editar</button>
-                <button className="bg-green-600 text-white px-4 py-2 rounded flex-1" 
-                  onClick={()=>{
-                    gerarPlanilha(false);
-                    setMostrarCompartilhar(true);
-                  }}>Confirmar e Enviar</button>
+              <div className="flex gap-2 mt-4">
+                {!enviado ? (
+                  <>
+                    <button className="bg-gray-400 text-white px-4 py-2 rounded flex-1" onClick={()=>setModoPreview(false)}>Editar</button>
+                    <button className="bg-green-600 text-white px-4 py-2 rounded flex-1" onClick={()=>gerarPlanilha(false)}>Confirmar e Enviar</button>
+                  </>
+                ) : (
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded w-full" onClick={()=>gerarPlanilha(false)}>Enviar Novamente</button>
+                )}
               </div>
-
-              {mostrarEnviarNovamente && (
-                <button 
-                  className="mt-4 bg-blue-600 text-white px-4 py-2 rounded w-full"
-                  onClick={()=>gerarPlanilha(false)}
-                >
-                  Enviar Novamente
-                </button>
-              )}
-
-              {mostrarCompartilhar && (
-                <div 
-                  className="absolute inset-0 bg-black bg-opacity-50 flex justify-center items-center"
-                  onClick={()=>setMostrarCompartilhar(false)}
-                >
-                  <div 
-                    className="bg-white p-4 rounded shadow"
-                    onClick={(e)=>e.stopPropagation()}
-                  >
-                    <h3 className="font-bold mb-2">Compartilhar Lista</h3>
-                    <button 
-                      className="bg-green-600 text-white px-4 py-2 rounded w-full"
-                      onClick={compartilharManual}
-                    >
-                      Compartilhar
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
