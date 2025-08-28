@@ -8,7 +8,50 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.0/firebase-app.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCV1fk9RS_Osigm4Aj9F_1S_KR1au0u4ZA",
+      authDomain: "base-lista-de-compras-45bde.firebaseapp.com",
+      projectId: "base-lista-de-compras-45bde",
+      storageBucket: "base-lista-de-compras-45bde.firebasestorage.app",
+      messagingSenderId: "593131825159",
+      appId: "1:593131825159:web:04094e799871a7fa21e2a2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const storage = getStorage(app);
+
+    window.gerarPDFFirebase = async function(sacola) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 10;
+      sacola.forEach(item => {
+        doc.text(`${item.quantidade} ${item.unidade} - ${item.nome} (${item.categoria})`, 10, y);
+        y += 10;
+        if (y > 280) { doc.addPage(); y = 10; }
+      });
+
+      const pdfBlob = doc.output("blob");
+      const nomeArquivo = `lista_compras_${Date.now()}.pdf`;
+      const storageRef = ref(storage, nomeArquivo);
+
+      try {
+        await uploadBytes(storageRef, pdfBlob);
+        const linkPDF = await getDownloadURL(storageRef);
+
+        const numeroFicticio = "557798280639";
+        const mensagem = encodeURIComponent(`Aqui está minha lista de compras: ${linkPDF}`);
+        window.open(`https://wa.me/${numeroFicticio}?text=${mensagem}`, "_blank");
+      } catch (err) {
+        console.error(err);
+        alert("Erro ao enviar PDF para o Firebase.");
+      }
+    }
+  </script>
 </head>
 <body class="bg-gray-100 min-h-screen flex justify-center items-start p-4">
   <div id="root" class="w-full max-w-2xl"></div>
@@ -33,7 +76,6 @@
       const [popupItem, setPopupItem] = useState(null);
       const [filtro, setFiltro] = useState("TODOS");
       const [modoPreview, setModoPreview] = useState(false);
-      const [enviado, setEnviado] = useState(false);
 
       const sugeridos = produtos.filter(p => 
         p.nome.toLowerCase().includes(busca.toLowerCase()) &&
@@ -54,55 +96,6 @@
 
       function excluirItem(idx) {
         setSacola(sacola.filter((_, i) => i !== idx));
-      }
-
-      async function gerarPlanilha(previsualizar = false) {
-        const porCategoria = {};
-        sacola.forEach(item => {
-          if (!porCategoria[item.categoria]) porCategoria[item.categoria] = [];
-          porCategoria[item.categoria].push(item);
-        });
-
-        if (previsualizar) {
-          setModoPreview(true);
-          return;
-        }
-
-        const wb = XLSX.utils.book_new();
-        Object.keys(porCategoria).forEach(cat => {
-          const linhas = [[cat]];
-          porCategoria[cat].forEach(i => {
-            linhas.push([`${i.quantidade} ${i.unidade} - ${i.nome}`]);
-          });
-          const ws = XLSX.utils.aoa_to_sheet(linhas);
-          XLSX.utils.book_append_sheet(wb, ws, cat);
-        });
-
-        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-        const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        const file = new File([blob], "lista_compras.xlsx", { type: blob.type });
-        const url = URL.createObjectURL(blob);
-
-        try {
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            // Compartilhamento nativo
-            await navigator.share({ title: "Lista de Compras", text: "Segue minha lista de compras:", files: [file] });
-            setEnviado(true);
-          } else {
-            // Fallback: abrir WhatsApp com link
-            alert("Não foi possível enviar o arquivo diretamente. O link será aberto no WhatsApp.");
-            const numero = "5585449700";
-            const mensagem = encodeURIComponent(`Segue minha lista de compras: ${url}`);
-            window.open(`https://wa.me/${numero}?text=${mensagem}`, "_blank");
-            setEnviado(true);
-          }
-        } catch (err) {
-          console.log("Erro no compartilhamento:", err);
-          const numero = "557798280639";
-          const mensagem = encodeURIComponent(`Segue minha lista de compras: ${url}`);
-          window.open(`https://wa.me/${numero}?text=${mensagem}`, "_blank");
-          setEnviado(true);
-        }
       }
 
       return (
@@ -144,9 +137,8 @@
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                <button onClick={()=>setPopupItem({outro:true, nome: "", imagem: "", categoria:"OUTROS"})} className="bg-yellow-500 text-white px-4 py-2 rounded flex-1">ADICIONAR OUTRO TIPO DE PRODUTO</button>
-
-                <button onClick={()=>gerarPlanilha(true)} className="bg-green-700 text-white px-4 py-2 rounded flex-1">MANDAR LISTA</button>
+                <button onClick={()=>setPopupItem({outro:true, nome: "", imagem: "", categoria:"OUTROS"})} className="bg-yellow-500 text-white px-4 py-2 rounded flex-1">ADICIONAR OUTRO PRODUTO</button>
+                <button className="bg-green-700 text-white px-4 py-2 rounded flex-1" onClick={()=>window.gerarPDFFirebase(sacola)}>MANDAR LISTA</button>
               </div>
 
               <h2 className="mt-6 mb-2 font-bold text-lg">Minha Sacola</h2>
@@ -165,34 +157,7 @@
                 ))}
               </div>
             </>
-          ) : (
-            <div className="bg-white p-4 rounded shadow">
-              <h2 className="text-lg font-bold mb-2">Pré-visualização</h2>
-              {Object.entries(sacola.reduce((acc, item) => {
-                if (!acc[item.categoria]) acc[item.categoria] = [];
-                acc[item.categoria].push(item);
-                return acc;
-              }, {})).map(([cat, itens]) => (
-                <div key={cat} className="mb-3">
-                  <div className="font-bold">{cat}</div>
-                  {itens.map((i, idx)=>(
-                    <div key={idx} className="ml-4">{i.quantidade} {i.unidade} - {i.nome}</div>
-                  ))}
-                </div>
-              ))}
-
-              <div className="flex gap-2 mt-4">
-                {!enviado ? (
-                  <>
-                    <button className="bg-gray-400 text-white px-4 py-2 rounded flex-1" onClick={()=>setModoPreview(false)}>Editar</button>
-                    <button className="bg-green-600 text-white px-4 py-2 rounded flex-1" onClick={()=>gerarPlanilha(false)}>Confirmar e Enviar</button>
-                  </>
-                ) : (
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded w-full" onClick={()=>gerarPlanilha(false)}>Enviar Novamente</button>
-                )}
-              </div>
-            </div>
-          )}
+          ) : null}
 
           {popupItem && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-2">
