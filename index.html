@@ -69,7 +69,6 @@
         }
 
         const wb = XLSX.utils.book_new();
-
         Object.keys(porCategoria).forEach(cat => {
           const linhas = [[cat]];
           porCategoria[cat].forEach(i => {
@@ -82,45 +81,38 @@
         const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
         const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         const file = new File([blob], "lista_compras.xlsx", { type: blob.type });
+        const url = URL.createObjectURL(blob);
 
         try {
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            // Compartilhar usando a tela padrão do dispositivo
-            await navigator.share({
-              title: "Lista de Compras",
-              text: "Segue minha lista de compras:",
-              files: [file]
-            });
+            // Compartilhamento nativo
+            await navigator.share({ title: "Lista de Compras", text: "Segue minha lista de compras:", files: [file] });
             setEnviado(true);
           } else {
-            // Fallback: gerar link para compartilhar manualmente
-            alert("Este dispositivo não suporta compartilhamento de arquivos diretamente. Será gerado um link para compartilhar.");
-            const url = URL.createObjectURL(blob);
-
-            if (navigator.share) {
-              await navigator.share({
-                title: "Lista de Compras",
-                text: `Segue minha lista de compras: ${url}`
-              });
-            } else {
-              prompt("Copie o link abaixo e cole no app que quiser:", url);
-            }
+            // Fallback: abrir WhatsApp com link
+            alert("Não foi possível enviar o arquivo diretamente. O link será aberto no WhatsApp.");
+            const numero = "5585449700";
+            const mensagem = encodeURIComponent(`Segue minha lista de compras: ${url}`);
+            window.open(`https://wa.me/${numero}?text=${mensagem}`, "_blank");
+            setEnviado(true);
           }
         } catch (err) {
-          console.log("Compartilhamento cancelado ou erro:", err);
+          console.log("Erro no compartilhamento:", err);
+          const numero = "557798280639";
+          const mensagem = encodeURIComponent(`Segue minha lista de compras: ${url}`);
+          window.open(`https://wa.me/${numero}?text=${mensagem}`, "_blank");
+          setEnviado(true);
         }
       }
 
       return (
         <div className="relative pb-24 w-full px-2 sm:px-4">
-          {/* Logo */}
           <div className="flex justify-center mb-4">
             <img src="https://i.ytimg.com/vi/S8KqLK1A8e0/mqdefault.jpg"/>
           </div>
 
           {!modoPreview ? (
             <>
-              {/* Filtros */}
               <div className="flex justify-center gap-2 mb-4 flex-wrap">
                 {["TODOS", "CARNES", "GRÃOS", "VERDURAS", "LIMPEZA"].map(cat=>(
                   <button 
@@ -132,7 +124,6 @@
                 ))}
               </div>
 
-              {/* Barra de busca */}
               <div className="mb-4 flex justify-center">
                 <input 
                   value={busca} 
@@ -144,7 +135,6 @@
                 />
               </div>
 
-              {/* Sugestões */}
               <div className="mb-4 flex flex-col gap-1">
                 {buscaAtiva && sugeridos.map((p,i)=>(
                   <div key={i} className="cursor-pointer flex items-center gap-2 p-2 bg-white rounded shadow" onClick={()=>setPopupItem(p)}>
@@ -153,14 +143,12 @@
                 ))}
               </div>
 
-              {/* Botões */}
               <div className="flex flex-col sm:flex-row gap-2 mb-6">
                 <button onClick={()=>setPopupItem({outro:true, nome: "", imagem: "", categoria:"OUTROS"})} className="bg-yellow-500 text-white px-4 py-2 rounded flex-1">ADICIONAR OUTRO TIPO DE PRODUTO</button>
 
                 <button onClick={()=>gerarPlanilha(true)} className="bg-green-700 text-white px-4 py-2 rounded flex-1">MANDAR LISTA</button>
               </div>
 
-              {/* Sacola */}
               <h2 className="mt-6 mb-2 font-bold text-lg">Minha Sacola</h2>
               <div className="flex flex-col gap-2">
                 {sacola.map((i,idx)=>(
@@ -206,7 +194,6 @@
             </div>
           )}
 
-          {/* Popup */}
           {popupItem && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-2">
               <div className="bg-white p-4 sm:p-6 rounded shadow w-full max-w-xs sm:max-w-sm">
